@@ -1,0 +1,20 @@
+{
+  "topologyType": "simple",
+
+  "superpeers": [
+    [1],
+    [0]
+  ],
+
+  "peers": [
+    0, 1
+  ],
+
+  "bufferSize": 64,
+
+  "timeToLive": 4,
+
+  "validationMethod": "push",
+
+  "timeToRefresh": 8
+}

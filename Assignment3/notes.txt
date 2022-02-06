@@ -1,0 +1,118 @@
+ERROR CHECKING
+requesting a file with the same name as a file that you already have
+requesting a file that the other peer does not have
+invalid peer id
+empty file name
+requesting an empty file
+properly deregistering on close
+properly registering on open
+might need "synchronized" keyword on register() function to prevent nextPeerId++ race condition
+server not running
+
+TO DO
+add makefile
+Handle buffer stream for Large files
+_____________________________________________________________________________________________________
+_____________________________________________________________________________________________________
+PA3 TO DO, NOTES, AND KNOWN BUGS
+/* --- start PA3 change --- */
+/* ---- end PA3 change ---- */
+
+- is there a way to mark a file READONLY after we download it?
+    managing folders seems messy, but we might have to do that
+- shutting down a client that has invalid/deregistered files throws an exception
+- I don't understand when the watch directory service returns EVENT_MODIFY vs EVENT_CREATE
+- shutting down a peer with an invalidated file throws an exception
+- what happens when two peers start with the same file (or file with the same name)?
+    who owns it?
+    is this allowed?
+    one will invalidate the other?
+- sometimes retrieving a file will trigger events of type CREATE, MODIFY, or BOTH.
+    I'm not sure when each happens but it's a problem
+- right now to find out if TTR expired, we keep track of the lastVerified timestamp and when thread wake up, if more than TTR has passed since then, we poll
+    poll just returns true or false depending on the validity of the version of the file. true = just update lastVerfied. false = invalidate & deregister
+    however, the assignment seems to imply that the best way is to decrement TTR until it is zero and then invalidate the file
+      when thread wakes up, decrement all TTR as appropriate. Those that are 0, poll
+      poll returns invalid message or a new TTR to replace the one that is now zero
+      either way, we check first that we are not the owner of the file. we don't need to poll for our own files, obviously.
+- assignment suggests to poll the SERVER but ours is written to poll the PEER CLIENT.
+    we did it this way because the client keeps track of the validity of all its files. invalid files get deregistered
+- factor out all "invalidate and deregister" blocks of code into a single function
+- print statements for polling functions get annoying so they have been commented out
+- when a file is downloaded, the auto-update mechanism generates  MODIFY event for the file, so the client will print
+    "YOU HAVE ILLEGALLY MODIFIED A FILE YOU DO NOT OWN." even though it shouldn't for a new file,
+    therefore we CAN'T actually invalidate and deregister, even though we would like to for the general/actual case
+    of modifying a file that you do not own. That is why the code that says " IT IS NOW INVALID AND DEREGISTERED" is commented out
+
+_____________________________________________________________________________________________________
+_____________________________________________________________________________________________________
+COMPLETED
+PULL-BASED APPROACH
+  the version in RetrievedFileInfo acts as the last-modified-time
+  when a client polls about a file it owns and the version is the same (file is valid),
+    it just updates the lastVerified Date to now
+  add extra fields to the FileInfo class as specified
+    origin server ID, TTR, last-modified-time
+    last-modified-time is the latest version of the master
+    the TTR is specified by the SERVER (this is why it is in the FileInfo class)
+  figure out how to tell when TTR has expired
+    store the TTR and a timestamp of when the file was saved in the new data structure (specified above)
+    if the new thread (specified below) detects that current time >= file timestamp + TTR, then the TTR has expired
+  add a POLL class? NO
+    file name, version
+  add poll remote function to superpeer
+    receives filename and version from a peer with a downloaded copy of a file
+    check version agaginst the registry that contains the master file
+    if master is newer respond with out-of-date indication message
+  create new thread on CLIENT that sleeps for TTR time (or maybe fraction of it) and then wakes up and checks the TTR for each downloaded file
+    if TTR expired (using method described above), then call poll on the ORIGINAL server (this info is stored in the client's new file data structure)
+    if poll returns file out-of-date message, deregister and delete it
+    print that it is doing so
+    eager polling seems easier than lazy polling
+    otherwise return new TTR
+  parse validationMethod and timeToRefresh from the config file
+  add  option to client terminal prompt to "refresh" an outdated file
+    download a new copy of that file, update data structure accordingly
+
+PUSH-BASED APPROACH
+  implement INVALIDATION message class
+    as spcified in assignment
+    with TTL?
+  implement data structure for CLIENT to keep track of all files and their validation creds
+    this structure is only used in the auto-update mechanism thread (?)
+    this will be used to check whether
+  new remote function for superpeer to send and receive INVALIDATION message
+    similar to forwardQuery()
+    in this remote function, the server will broadcast INVALIDATION message to neighor superpeers (use same TTL from config file)
+    INVALIDATION message is broadcasted just like QUERY message
+    called by the auto-update mechanism thread of the client
+    check the existing data structure to see if this superpeer has an entry for the file
+    for every connected leafnode peer client that is NOT the owner of this file,
+      deregister it and notify leafnode peer client to delete it
+  at startup, client should load all its files into the fileStore of RetrievedFileInfo's, and mark the OWNER field as TRUE
+  new data structure for superpeer to track whethere an INVALIDATION message has been seen before
+    do we need this? is it a problem if a superpeer receives the same INVALIDATION message twice?
+  new remote function for leafnode peer client to discard invalidated file
+    called by the above remote function of the superpeer
+    deletes file (UPDATE: NO.)
+  if the auto-update mechanism detects file MODIFIED AND NOT THE OWNER, just deregister and delete it?
+    this is an issue and theoretically this case shouldn't exist
+    practically, a modification of a local copy of a foreign file should be treated just
+      like if the modification were to have happened on the master copy; only this time,
+      the modification is not valid and so this peer does not get the privelege of broadcasting
+      an INVALIDATION message to anyone. it basically just invalidated the file itself.
+  when the auto-update mechanism detects file MODIFIED AND IT IS THE OWNER, call the server with new version details
+    this call will happen from the auto update mechanism thread
+    may need to send TTL to server? included in INVALIDATION message
+    TTL: then we have to handle whether the superpeer has the the INVALIDATION message before (just like queries)
+  change superpeer to only include valid files in a queryhit
+    do we need this if we deregister invalid files?
+    should we be deregistering/deleting invalid files, or just marking them so?
+    if we're deleting, why do we need the invalid flag?
+    if we have invalid files, do we need to automatically re-retrieve them?
+  add option to client command prompt to "modify" a file that the peer client owns for testing
+    select from list of files the peer client owns
+    modification: add a line of text or something basic
+  wrap all this code in "if(validationmethod == push)" if statement
+  revalidation procedure?
+    notify user when a file becomes invalid, give option to refresh it (retrieve the latest version)

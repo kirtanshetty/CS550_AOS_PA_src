@@ -1,0 +1,19 @@
+SUPERPEER
+number of superpeers = length of this array = 8
+i = id for superpeer
+element at index i = list of superpeers to which superpeer i should connect
+
+PEER
+number of peers = length of this array = 17
+j = config id for peer (actual useful id assigned by superpeer will be different; this is just for static configuration)
+element at index j = id of superpeer to which peer with config id j should connect
+each of the eight superpeers will have 1-3 peers connected to it
+
+BUFFERSIZE
+size of the historical message buffer
+so a superpeer knows if it has seen/forwarded a query message before
+and knows where to back-propagate a queryhit message
+
+TTL
+time to live
+so a message is not forwarded indefinitely

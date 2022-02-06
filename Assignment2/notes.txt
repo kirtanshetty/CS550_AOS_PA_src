@@ -1,0 +1,15 @@
+ERROR CHECKING
+requesting a file with the same name as a file that you already have
+requesting a file that the other peer does not have
+invalid peer id
+empty file name
+requesting an empty file
+properly deregistering on close
+properly registering on open
+might need "synchronized" keyword on register() function to prevent nextPeerId++ race condition
+server not running
+
+TO DO
+add makefile
+
+Handle buffer stream for Large files
